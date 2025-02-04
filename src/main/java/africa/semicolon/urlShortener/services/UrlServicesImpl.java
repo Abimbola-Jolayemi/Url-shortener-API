@@ -6,11 +6,16 @@ import africa.semicolon.urlShortener.dtos.GetOriginalUrlResponse;
 import africa.semicolon.urlShortener.dtos.UrlRequest;
 import africa.semicolon.urlShortener.dtos.UrlResponse;
 import africa.semicolon.urlShortener.exceptions.UrlNotFoundException;
+import africa.semicolon.urlShortener.services.UrlServices;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.json.JSONObject;
 
 import java.util.Optional;
-import java.util.Random;
 
 @Service
 public class UrlServicesImpl implements UrlServices {
@@ -18,29 +23,24 @@ public class UrlServicesImpl implements UrlServices {
     @Autowired
     private UrlRepository urlRepository;
 
-    private static final String BASE_URL = "https://snip.com/";
-    private static final String CHARACTERS = "abcdefghijklmnopqrstuvwxyz0123456789";
-    private static final int SHORTENED_URL_LENGTH = 5;
-
-    private final Random random = new Random();
+    private static final String BITLY_ACCESS_TOKEN = "93d7a4897d46f2d95b1e01694a0c3f5cc2338cba";
+    private static final String BITLY_API_URL = "https://api-ssl.bitly.com/v4/shorten";
 
     @Override
     public UrlResponse shortenUrl(UrlRequest request) {
-
         UrlResponse response = new UrlResponse();
 
         Optional<Url> existingUrl = urlRepository.findByOriginalUrl(request.getOriginalUrl());
-
         if (existingUrl.isPresent()) {
             response.setOriginalUrl(existingUrl.get().getOriginalUrl());
             response.setShortenedUrl(existingUrl.get().getShortenedUrl());
             return response;
         }
 
-        String shortenedUrl = generateUniqueShortenedUrl();
+        String shortenedUrl = callBitlyApi(request.getOriginalUrl());
         Url url = new Url();
         url.setOriginalUrl(request.getOriginalUrl());
-        url.setShortenedUrl(BASE_URL + shortenedUrl);
+        url.setShortenedUrl(shortenedUrl);
 
         urlRepository.save(url);
 
@@ -50,8 +50,32 @@ public class UrlServicesImpl implements UrlServices {
         return response;
     }
 
+    private String callBitlyApi(String longUrl) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + BITLY_ACCESS_TOKEN);
+            headers.set("Content-Type", "application/json");
+
+            JSONObject payload = new JSONObject();
+            payload.put("long_url", longUrl);
+
+            HttpEntity<String> request = new HttpEntity<>(payload.toString(), headers);
+            RestTemplate restTemplate = new RestTemplate();
+            ResponseEntity<String> response = restTemplate.postForEntity(BITLY_API_URL, request, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                JSONObject responseBody = new JSONObject(response.getBody());
+                return responseBody.getString("id");
+            } else {
+                throw new RuntimeException("Failed to shorten URL: " + response.getStatusCode());
+            }
+        } catch (Exception exception) {
+            throw new RuntimeException("Error during Bitly API call", exception);
+        }
+    }
+
     @Override
-    public GetOriginalUrlResponse getOriginalUrl(String shortenedUrl){
+    public GetOriginalUrlResponse getOriginalUrl(String shortenedUrl) {
         Optional<Url> foundUrl = urlRepository.findByShortenedUrl(shortenedUrl);
         Url url = foundUrl.orElseThrow(() -> new UrlNotFoundException("Shortened URL not found: " + shortenedUrl));
 
@@ -65,31 +89,5 @@ public class UrlServicesImpl implements UrlServices {
         Url url = urlRepository.findByShortenedUrl(shortenedUrl)
                 .orElseThrow(() -> new UrlNotFoundException("Shortened URL not found"));
         return url.getOriginalUrl();
-    }
-
-    private String generateUniqueShortenedUrl() {
-        String shortenedUrl;
-        do {
-            shortenedUrl = generateShortenedUrl();
-        } while (urlRepository.findByShortenedUrl(shortenedUrl).isPresent());
-        return shortenedUrl;
-    }
-
-    private String generateShortenedUrl() {
-        String randomString = generateRandomString(SHORTENED_URL_LENGTH);
-        return formatShortenedUrl(randomString);
-    }
-
-    private String generateRandomString(int length) {
-        StringBuilder stringBuilder = new StringBuilder(length);
-        for (int index = 0; index < length; index++) {
-            int characterIndex = random.nextInt(CHARACTERS.length());
-            stringBuilder.append(CHARACTERS.charAt(characterIndex));
-        }
-        return stringBuilder.toString();
-    }
-
-    private String formatShortenedUrl(String generatedString) {
-        return "snip-" + generatedString;
     }
 }
