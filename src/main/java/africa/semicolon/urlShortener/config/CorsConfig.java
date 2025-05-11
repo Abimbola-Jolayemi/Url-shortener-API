@@ -13,7 +13,7 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5178")
+                        .allowedOrigins("https://sniplinks.onrender.com", "http://localhost:5178")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
@@ -21,6 +21,4 @@ public class CorsConfig {
         };
     }
 }
-
-
 
