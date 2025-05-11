@@ -23,7 +23,7 @@ public class UrlServicesImpl implements UrlServices {
     @Autowired
     private UrlRepository urlRepository;
 
-    private static final String BITLY_ACCESS_TOKEN = "93d7a4897d46f2d95b1e01694a0c3f5cc2338cba";
+    private static final String BITLY_ACCESS_TOKEN = "dcc0aaf9ad6841d14821198a6b4844c5590bb636";
     private static final String BITLY_API_URL = "https://api-ssl.bitly.com/v4/shorten";
 
     @Override
